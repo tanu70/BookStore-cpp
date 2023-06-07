@@ -1,0 +1,3 @@
+/home/user/Desktop/Drive/Temp/BookStore-cpp/cmake-build-debug/CMakeFiles/untitled.dir
+/home/user/Desktop/Drive/Temp/BookStore-cpp/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/user/Desktop/Drive/Temp/BookStore-cpp/cmake-build-debug/CMakeFiles/rebuild_cache.dir

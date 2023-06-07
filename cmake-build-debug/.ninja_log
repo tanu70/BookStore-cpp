@@ -1,0 +1,8 @@
+# ninja log v5
+1	932	1686127694593480402	CMakeFiles/untitled.dir/main.cpp.o	5b6d8af53b5ce34a
+1	791	1686127935505241877	CMakeFiles/untitled.dir/http_tcpServer.cpp.o	2f6bd411b81b4f80
+791	824	1686127935541241250	untitled	336e89df45827d6d
+0	10	1686128680184489090	build.ninja	e2a82ecd4d1cdc10
+1	810	1686128680996475334	CMakeFiles/untitled.dir/main.cpp.o	5940f07f58ca3b93
+1	821	1686128681008475131	CMakeFiles/untitled.dir/http_tcpServer.cpp.o	41d1d8a0adabc47b
+821	854	1686128681040474589	untitled	336e89df45827d6d

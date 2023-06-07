@@ -4,6 +4,10 @@
 #include "http_tcpServer.h"
 #include <bits/stdc++.h>
 #include <sys/socket.h>
+#include "json.hpp"
+
+
+using json = nlohmann::json;
 
 namespace {
     const int BUFFER_SIZE = 30720;
@@ -60,38 +64,50 @@ namespace http{
         exit(0);
     }
 
-    std::string TcpServer::buildResponse() {
-        //std::cout<< "came Here";
-        //return "<html>Tanu</html>";
+    std::string TcpServer::buildResponse(std::string resBody) {
 
         std::string htmlFile = "<!DOCTYPE html><html lang=\"en\"><body><h1> HOME </h1><p> Hello from your Server :) </p></body></html>";
         std::ostringstream ss;
-        ss << "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: " << htmlFile.size() << "\n\n"
+
+        if(!resBody.empty()){
+            htmlFile = resBody;
+        }
+        ss << "HTTP/1.1 200 OK\nContent-Type: application/json\nContent-Length: " << htmlFile.size() << "\n\n"
            << htmlFile;
 
         return ss.str();
     }
 
     void TcpServer::startListen() {
+        
         if(listen(m_socket, 20) <0)
         {
             exitWithError("Socket listen Failed!!!");
         }
-
         std:: ostringstream ss;
         ss << "\n*** Listening on ADDRESS: "
            << inet_ntoa(m_socketAddress.sin_addr)
            << " PORT: " << ntohs(m_socketAddress.sin_port)
            << " ***\n\n";
-
         log(ss.str());
+
         int bytesReceived;
         while(true)
         {
             char buffer[BUFFER_SIZE] = {0};
             acceptConnection();
             bytesReceived = read(m_newSocket, buffer, BUFFER_SIZE);
+            std::cout<<buffer<<std::endl;
+            //json req = json::parse(buffer);
 
+            auto jsonBody = getJsonBody(buffer);
+            std::cout<< "  Got Json Body    " << jsonBody << "\n";
+            auto serializedBody = jsonBody.dump();
+
+            m_serverMessage = buildResponse(serializedBody);
+
+
+            //std::cout<<req<<std::endl;
             if(bytesReceived <0)
             {
                 exitWithError("Failed to read bytes from client socket connection");
@@ -122,6 +138,7 @@ namespace http{
     void TcpServer::sendResponse() {
         int bytesSent;
         std::cout<< ++reqCount<<std::endl;
+
         bytesSent = write(m_newSocket, m_serverMessage.c_str(), m_serverMessage.size());
 
         if(bytesSent == m_serverMessage.size())
@@ -133,6 +150,35 @@ namespace http{
         }
     }
 
+}
+
+namespace http {
+    json TcpServer::getJsonBody(char* req)
+    {
+        bool flag = false;
+        std::string body;
+
+        for(int i =0;i<BUFFER_SIZE && req[i]!=0;i++)
+        {
+
+            if(req[i]==10 && req[i+1]=='{'){
+                flag = true;
+            }
+            if(flag){
+                body+=req[i];
+            }
+        }
+
+        json jsonBody;
+
+        if(body.empty()){
+            return jsonBody;
+        }
+
+        jsonBody= json::parse(body);
+
+        return jsonBody;
+    }
 }
 
 

@@ -3,6 +3,9 @@
 //
 #include <bits/stdc++.h>
 #include <arpa/inet.h>
+#include "json.hpp"
+
+using json = nlohmann::json;
 
 #ifndef UNTITLED_HTTP_TCPSERVER_H
 #define UNTITLED_HTTP_TCPSERVER_H
@@ -25,9 +28,11 @@ namespace http {
 
         int startServer();
         void closeServer();
-        std::string buildResponse();
+        std::string buildResponse(std::string resBody = "");
         void acceptConnection();
         void sendResponse();
+
+        json getJsonBody(char* req);
 
         int reqCount=0;
 

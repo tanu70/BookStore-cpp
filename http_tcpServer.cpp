@@ -5,6 +5,7 @@
 #include <bits/stdc++.h>
 #include <sys/socket.h>
 #include "json.hpp"
+#include "Base64.h"
 
 
 using json = nlohmann::json;
@@ -114,6 +115,7 @@ namespace http{
             log(ss.str());
 
             auto reqInfo = parseReqInfo(buffer);
+            bool isAdmin = checkAdminAuth(reqInfo);
 
             switch (reqInfo.reqMethod) {
                 case GET:
@@ -168,8 +170,8 @@ namespace http{
 namespace http { //Data Processing Functions
 
     TcpServer::ReqInfo TcpServer::parseReqInfo(char *req) {
-        bool methodFlag = true, pathFlag = false, jsonFlag = false;
-        std::string method, path, body;
+        bool methodFlag = true, pathFlag = false, jsonFlag = false, lookingForAuth = false, authFlag = false;
+        std::string method, path, body, tempStr, authStr;
         ReqInfo reqInfo;
 
         for (int i = 0; i < BUFFER_SIZE && req[i] != 0; i++) {
@@ -195,14 +197,34 @@ namespace http { //Data Processing Functions
                     }
                     path = "";
                     pathFlag = false;
+                    lookingForAuth = true;
+                    std::cout<<i<<std::endl;
                 } else {
                     path += req[i];
                 }
             }
-
+            else if(lookingForAuth)
+            {
+                if((int)req[i]==10){
+                    std::stringstream ss(tempStr);
+                    std::string tmp,a,b;
+                    ss >> tmp;
+                    std::cout<<tmp<<std::endl;
+                    if(tmp == "Authorization:"){
+                        ss>>a>>b;
+                        reqInfo.authToken = b;
+                        lookingForAuth = false;
+                    }
+                    tempStr = "";
+                }
+                else{
+                    tempStr += req[i];
+                }
+            }
 
             if (req[i] == 10 && req[i + 1] == '{') {
                 jsonFlag = true;
+                lookingForAuth = false;
             } else if (jsonFlag) {
                 body += req[i];
             }
@@ -224,6 +246,14 @@ namespace http { //Data Processing Functions
 
         return reqInfo;
 
+    }
+
+    bool TcpServer::checkAdminAuth(http::TcpServer::ReqInfo reqInfo) {
+        std::string adminToken = macaron::Base64::Encode("admin01:adminPass");
+        if(adminToken == reqInfo.authToken){
+            return true;
+        }
+        return false;
     }
 }
 
@@ -258,15 +288,16 @@ namespace http{ // Request Handling Functions
         m_serverMessage = buildResponse(serializedBookData);
         std::cout<< m_serverMessage<< std :: endl;
         sendResponse();
-//        std::cout<< " Came to GetReqHandler" <<reqInfo.reqMethod<< std::endl;
-//        for(auto mem:reqInfo.pathVariables){
-//            std::cout<<mem<<std::endl;
-//        }
+
         return;
     }
 
     void TcpServer::reqPostHandler(TcpServer::ReqInfo reqInfo) {
 
+        if(!checkAdminAuth(reqInfo)){
+            returnErrorResponse(403, "Not Authorized");
+            return;
+        }
         BookInfo newBook;
         json bookInfoJson = reqInfo.jsonBody;
         newBook.bookId = nextBookId++;
@@ -284,6 +315,10 @@ namespace http{ // Request Handling Functions
     }
 
     void TcpServer::reqPutHandler(TcpServer::ReqInfo reqInfo) {
+        if(!checkAdminAuth(reqInfo)){
+            returnErrorResponse(403, "Not Authorized");
+            return;
+        }
         int pathSz = reqInfo.pathVariables.size();
         if(pathSz ==2){
             int updateBookId = stoi(reqInfo.pathVariables[1]);
@@ -323,6 +358,12 @@ namespace http{ // Request Handling Functions
     }
 
     void TcpServer::reqDeleteHandler(TcpServer::ReqInfo reqInfo) {
+
+        if(!checkAdminAuth(reqInfo)){
+            returnErrorResponse(403, "Not Authorized");
+            return;
+        }
+
         if(reqInfo.pathVariables.size()>1){
             int deleteBookId = stoi(reqInfo.pathVariables[1]);
             bool deletedFlag = false;

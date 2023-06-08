@@ -4,6 +4,7 @@
 #include <bits/stdc++.h>
 #include <arpa/inet.h>
 #include "json.hpp"
+#include "Base64.h"
 
 using json = nlohmann::json;
 
@@ -31,6 +32,7 @@ namespace http {
             json jsonBody;
             std::vector<std::string>pathVariables;
             int nxtMatchPathInd;
+            std::string authToken;
         };
 
     private:
@@ -58,9 +60,8 @@ namespace http {
         void acceptConnection();
         void sendResponse();
 
-        json getJsonBody(char* req);
-        RequestMethod getReqMethod(char* req);
         ReqInfo parseReqInfo(char* req);
+        bool checkAdminAuth(ReqInfo reqInfo);
 
         void reqGetHandler(ReqInfo reqInfo);
         void reqPostHandler(ReqInfo reqInfo);

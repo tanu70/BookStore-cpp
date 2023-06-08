@@ -69,14 +69,12 @@ namespace http{
 
         std::string htmlFile = "<!DOCTYPE html><html lang=\"en\"><body><h1> HOME </h1><p> Hello from your Server :) </p></body></html>";
         std::ostringstream ss;
-        std::string responseHeader = "200 OK\n";
-
+        std::string responseHeader;
         responseHeader = std::to_string(resCode) + " " + resMessage + "\n";
 
         if(!resBody.empty()){
             htmlFile = resBody;
         }
-
 
         ss << "HTTP/1.1 "<< responseHeader <<"Content-Type: application/json\nContent-Length: " << htmlFile.size() << "\n\n"
            << htmlFile;
@@ -90,6 +88,7 @@ namespace http{
         {
             exitWithError("Socket listen Failed!!!");
         }
+
         std:: ostringstream ss;
         ss << "\n*** Listening on ADDRESS: "
            << inet_ntoa(m_socketAddress.sin_addr)
@@ -115,7 +114,6 @@ namespace http{
             log(ss.str());
 
             auto reqInfo = parseReqInfo(buffer);
-            bool isAdmin = checkAdminAuth(reqInfo);
 
             switch (reqInfo.reqMethod) {
                 case GET:
@@ -209,7 +207,6 @@ namespace http { //Data Processing Functions
                     std::stringstream ss(tempStr);
                     std::string tmp,a,b;
                     ss >> tmp;
-                    std::cout<<tmp<<std::endl;
                     if(tmp == "Authorization:"){
                         ss>>a>>b;
                         reqInfo.authToken = b;
@@ -263,9 +260,16 @@ namespace http{ // Request Handling Functions
 
         std::string serializedBookData;
         int sz = bookStore.size();
-        if(sz>1) serializedBookData += '[';
+
+        int targetBookId = -1;
+
+        if(reqInfo.pathVariables.size() > 1){
+            targetBookId = stoi(reqInfo.pathVariables[1]);
+        }
+
         for(int i = 0;i<sz;i++)
         {
+            if(targetBookId!=-1 && bookStore[i].bookId!=targetBookId)continue;
             json tmpBook;
             tmpBook["bookId"] = bookStore[i].bookId;
             tmpBook["bookTitle"] = bookStore[i].bookTitle;
@@ -279,11 +283,12 @@ namespace http{ // Request Handling Functions
             }
 
         }
-        if(sz>1)serializedBookData += ']';
 
-        if(serializedBookData.empty()){
-            serializedBookData = "[]";
-        }
+        serializedBookData ='[' + serializedBookData + ']';
+
+//        if(serializedBookData.empty()){
+//            serializedBookData = "[]";
+//        }
 
         m_serverMessage = buildResponse(serializedBookData);
         std::cout<< m_serverMessage<< std :: endl;
@@ -298,17 +303,16 @@ namespace http{ // Request Handling Functions
             returnErrorResponse(403, "Not Authorized");
             return;
         }
+
         BookInfo newBook;
         json bookInfoJson = reqInfo.jsonBody;
         newBook.bookId = nextBookId++;
         newBook.bookTitle = bookInfoJson["bookTitle"];
         newBook.author = bookInfoJson["author"];
         newBook.pageCount = bookInfoJson["pageCount"];
-
         bookStore.push_back(newBook);
 
         m_serverMessage = buildResponse("Book Created Successfully");
-
         sendResponse();
 
         return;
@@ -319,8 +323,10 @@ namespace http{ // Request Handling Functions
             returnErrorResponse(403, "Not Authorized");
             return;
         }
+
         int pathSz = reqInfo.pathVariables.size();
         if(pathSz ==2){
+
             int updateBookId = stoi(reqInfo.pathVariables[1]);
             bool updatedFlag = false;
 

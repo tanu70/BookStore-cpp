@@ -11,11 +11,28 @@ using json = nlohmann::json;
 #define UNTITLED_HTTP_TCPSERVER_H
 
 namespace http {
+
+
     class TcpServer{
     public:
         TcpServer(std::string ip_address, int port);
         ~TcpServer();
         void startListen();
+
+        enum RequestMethod{
+            GET,
+            POST,
+            PUT,
+            DELETE
+        };
+
+        struct ReqInfo{
+            RequestMethod reqMethod;
+            json jsonBody;
+            std::vector<std::string>pathVariables;
+            int nxtMatchPathInd;
+        };
+
     private:
         int m_socket;
         int m_newSocket;
@@ -26,6 +43,14 @@ namespace http {
         unsigned int m_socketAddressLen;
         std::string m_serverMessage;
 
+        struct BookInfo{
+            std::string bookTitle,author;
+            int bookId, pageCount;
+
+        };
+
+        std::vector<BookInfo> bookStore;
+
         int startServer();
         void closeServer();
         std::string buildResponse(std::string resBody = "");
@@ -33,8 +58,15 @@ namespace http {
         void sendResponse();
 
         json getJsonBody(char* req);
+        RequestMethod getReqMethod(char* req);
+        ReqInfo parseReqInfo(char* req);
+
+        void reqGetHandler(ReqInfo reqInfo);
+        void reqPostHandler(ReqInfo reqInfo);
 
         int reqCount=0;
+
+
 
     };
 }

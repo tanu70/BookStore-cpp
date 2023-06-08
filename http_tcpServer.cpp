@@ -79,7 +79,7 @@ namespace http{
     }
 
     void TcpServer::startListen() {
-        
+
         if(listen(m_socket, 20) <0)
         {
             exitWithError("Socket listen Failed!!!");
@@ -100,11 +100,11 @@ namespace http{
             std::cout<<buffer<<std::endl;
             //json req = json::parse(buffer);
 
-            auto jsonBody = getJsonBody(buffer);
-            std::cout<< "  Got Json Body    " << jsonBody << "\n";
-            auto serializedBody = jsonBody.dump();
 
-            m_serverMessage = buildResponse(serializedBody);
+//            auto serializedBody = reqInfo.jsonBody.dump();
+//
+//            m_serverMessage = buildResponse(serializedBody);
+
 
 
             //std::cout<<req<<std::endl;
@@ -117,7 +117,19 @@ namespace http{
             ss << "------ Received Request from client ------\n\n";
             log(ss.str());
 
-            sendResponse();
+            auto reqInfo = parseReqInfo(buffer);
+
+            switch (reqInfo.reqMethod) {
+                case GET:
+                    reqGetHandler(reqInfo);
+                    break;
+                case POST:
+                    reqPostHandler(reqInfo);
+                    break;
+                default:
+                    break;
+            }
+            //sendResponse();
             close(m_newSocket);
 
         }
@@ -153,7 +165,7 @@ namespace http{
 }
 
 namespace http {
-    json TcpServer::getJsonBody(char* req)
+    /*json TcpServer::getJsonBody(char* req)
     {
         bool flag = false;
         std::string body;
@@ -178,7 +190,103 @@ namespace http {
         jsonBody= json::parse(body);
 
         return jsonBody;
+    }*/
+
+
+    TcpServer::ReqInfo TcpServer::parseReqInfo(char *req) {
+        bool methodFlag = true, pathFlag = false, jsonFlag = false;
+        std::string method,path,body;
+        ReqInfo reqInfo;
+
+        for(int i =0;i<BUFFER_SIZE && req[i]!=0;i++)
+        {
+
+            if(methodFlag)
+            {
+                if(req[i]==' '){
+                    methodFlag = false;
+                    pathFlag = true;
+                }
+                else{
+                    method += req[i];
+                }
+            }
+            else if(pathFlag)
+            {
+                if(req[i]=='/'){
+                    if(!path.empty()){
+                        reqInfo.pathVariables.push_back(path);
+
+                    }
+                    path = "";
+                }
+                else if(req[i]==' '){
+                    if(!path.empty()){
+                        reqInfo.pathVariables.push_back(path);
+
+                    }
+                    path = "";
+                    pathFlag = false;
+                }
+                else{
+                    path += req[i];
+                }
+            }
+
+
+            if(req[i]==10 && req[i+1]=='{'){
+                jsonFlag = true;
+            }
+            else if(jsonFlag) {
+                body += req[i];
+            }
+        }
+
+        if(!body.empty()){
+            reqInfo.jsonBody = json::parse(body);
+        }
+
+        if(method == "GET"){
+            reqInfo.reqMethod = GET;
+        }
+        else if(method == "POST"){
+            reqInfo.reqMethod = POST;
+        }
+        else if(method == "PUT")
+        {
+            reqInfo.reqMethod = PUT;
+        }
+        else if(method == "DELETE")
+        {
+            reqInfo.reqMethod = DELETE;
+        }
+
+        return reqInfo;
+
     }
+
+    void TcpServer::reqGetHandler(http::TcpServer::ReqInfo reqInfo) {
+        m_serverMessage = buildResponse();
+        sendResponse();
+        std::cout<< " Came to GetReqHandler" <<reqInfo.reqMethod<< std::endl;
+        for(auto mem:reqInfo.pathVariables){
+            std::cout<<mem<<std::endl;
+        }
+        return;
+    }
+
+    void TcpServer::reqPostHandler(http::TcpServer::ReqInfo reqInfo) {
+
+        std::string stringBody = reqInfo.jsonBody.dump();
+        m_serverMessage = buildResponse(stringBody);
+        std::cout<< " Came to gethandler  " <<reqInfo.reqMethod<< std::endl;
+        for(auto mem:reqInfo.pathVariables){
+            std::cout<<mem<<std::endl;
+        }
+        sendResponse();
+        return;
+    }
+
 }
 
 

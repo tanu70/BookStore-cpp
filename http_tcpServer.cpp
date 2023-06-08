@@ -64,15 +64,20 @@ namespace http{
         exit(0);
     }
 
-    std::string TcpServer::buildResponse(std::string resBody) {
+    std::string TcpServer::buildResponse(std::string resBody, int resCode, std::string resMessage) {
 
         std::string htmlFile = "<!DOCTYPE html><html lang=\"en\"><body><h1> HOME </h1><p> Hello from your Server :) </p></body></html>";
         std::ostringstream ss;
+        std::string responseHeader = "200 OK\n";
+
+        responseHeader = std::to_string(resCode) + " " + resMessage + "\n";
 
         if(!resBody.empty()){
             htmlFile = resBody;
         }
-        ss << "HTTP/1.1 200 OK\nContent-Type: application/json\nContent-Length: " << htmlFile.size() << "\n\n"
+
+
+        ss << "HTTP/1.1 "<< responseHeader <<"Content-Type: application/json\nContent-Length: " << htmlFile.size() << "\n\n"
            << htmlFile;
 
         return ss.str();
@@ -98,16 +103,7 @@ namespace http{
             acceptConnection();
             bytesReceived = read(m_newSocket, buffer, BUFFER_SIZE);
             std::cout<<buffer<<std::endl;
-            //json req = json::parse(buffer);
 
-
-//            auto serializedBody = reqInfo.jsonBody.dump();
-//
-//            m_serverMessage = buildResponse(serializedBody);
-
-
-
-            //std::cout<<req<<std::endl;
             if(bytesReceived <0)
             {
                 exitWithError("Failed to read bytes from client socket connection");
@@ -126,6 +122,11 @@ namespace http{
                 case POST:
                     reqPostHandler(reqInfo);
                     break;
+                case PUT:
+                    reqPutHandler(reqInfo);
+                    break;
+                case DELETE:
+                    reqDeleteHandler(reqInfo);
                 default:
                     break;
             }
@@ -164,128 +165,198 @@ namespace http{
 
 }
 
-namespace http {
-    /*json TcpServer::getJsonBody(char* req)
-    {
-        bool flag = false;
-        std::string body;
-
-        for(int i =0;i<BUFFER_SIZE && req[i]!=0;i++)
-        {
-
-            if(req[i]==10 && req[i+1]=='{'){
-                flag = true;
-            }
-            if(flag){
-                body+=req[i];
-            }
-        }
-
-        json jsonBody;
-
-        if(body.empty()){
-            return jsonBody;
-        }
-
-        jsonBody= json::parse(body);
-
-        return jsonBody;
-    }*/
-
+namespace http { //Data Processing Functions
 
     TcpServer::ReqInfo TcpServer::parseReqInfo(char *req) {
         bool methodFlag = true, pathFlag = false, jsonFlag = false;
-        std::string method,path,body;
+        std::string method, path, body;
         ReqInfo reqInfo;
 
-        for(int i =0;i<BUFFER_SIZE && req[i]!=0;i++)
-        {
+        for (int i = 0; i < BUFFER_SIZE && req[i] != 0; i++) {
 
-            if(methodFlag)
-            {
-                if(req[i]==' '){
+            if (methodFlag) {
+                if (req[i] == ' ') {
                     methodFlag = false;
                     pathFlag = true;
-                }
-                else{
+                } else {
                     method += req[i];
                 }
-            }
-            else if(pathFlag)
-            {
-                if(req[i]=='/'){
-                    if(!path.empty()){
+            } else if (pathFlag) {
+                if (req[i] == '/') {
+                    if (!path.empty()) {
                         reqInfo.pathVariables.push_back(path);
 
                     }
                     path = "";
-                }
-                else if(req[i]==' '){
-                    if(!path.empty()){
+                } else if (req[i] == ' ') {
+                    if (!path.empty()) {
                         reqInfo.pathVariables.push_back(path);
 
                     }
                     path = "";
                     pathFlag = false;
-                }
-                else{
+                } else {
                     path += req[i];
                 }
             }
 
 
-            if(req[i]==10 && req[i+1]=='{'){
+            if (req[i] == 10 && req[i + 1] == '{') {
                 jsonFlag = true;
-            }
-            else if(jsonFlag) {
+            } else if (jsonFlag) {
                 body += req[i];
             }
         }
 
-        if(!body.empty()){
+        if (!body.empty()) {
             reqInfo.jsonBody = json::parse(body);
         }
 
-        if(method == "GET"){
+        if (method == "GET") {
             reqInfo.reqMethod = GET;
-        }
-        else if(method == "POST"){
+        } else if (method == "POST") {
             reqInfo.reqMethod = POST;
-        }
-        else if(method == "PUT")
-        {
+        } else if (method == "PUT") {
             reqInfo.reqMethod = PUT;
-        }
-        else if(method == "DELETE")
-        {
+        } else if (method == "DELETE") {
             reqInfo.reqMethod = DELETE;
         }
 
         return reqInfo;
 
     }
+}
 
-    void TcpServer::reqGetHandler(http::TcpServer::ReqInfo reqInfo) {
-        m_serverMessage = buildResponse();
+namespace http{ // Request Handling Functions
+
+    void TcpServer::reqGetHandler(TcpServer::ReqInfo reqInfo) {
+
+        std::string serializedBookData;
+        int sz = bookStore.size();
+        if(sz>1) serializedBookData += '[';
+        for(int i = 0;i<sz;i++)
+        {
+            json tmpBook;
+            tmpBook["bookId"] = bookStore[i].bookId;
+            tmpBook["bookTitle"] = bookStore[i].bookTitle;
+            tmpBook["author"] = bookStore[i].author;
+            tmpBook["pageCount"] = bookStore[i].pageCount;
+
+            serializedBookData += tmpBook.dump();
+
+            if(i<sz-1){
+                serializedBookData += ',';
+            }
+
+        }
+        if(sz>1)serializedBookData += ']';
+
+        if(serializedBookData.empty()){
+            serializedBookData = "[]";
+        }
+
+        m_serverMessage = buildResponse(serializedBookData);
+        std::cout<< m_serverMessage<< std :: endl;
         sendResponse();
-        std::cout<< " Came to GetReqHandler" <<reqInfo.reqMethod<< std::endl;
-        for(auto mem:reqInfo.pathVariables){
-            std::cout<<mem<<std::endl;
+//        std::cout<< " Came to GetReqHandler" <<reqInfo.reqMethod<< std::endl;
+//        for(auto mem:reqInfo.pathVariables){
+//            std::cout<<mem<<std::endl;
+//        }
+        return;
+    }
+
+    void TcpServer::reqPostHandler(TcpServer::ReqInfo reqInfo) {
+
+        BookInfo newBook;
+        json bookInfoJson = reqInfo.jsonBody;
+        newBook.bookId = nextBookId++;
+        newBook.bookTitle = bookInfoJson["bookTitle"];
+        newBook.author = bookInfoJson["author"];
+        newBook.pageCount = bookInfoJson["pageCount"];
+
+        bookStore.push_back(newBook);
+
+        m_serverMessage = buildResponse("Book Created Successfully");
+
+        sendResponse();
+
+        return;
+    }
+
+    void TcpServer::reqPutHandler(TcpServer::ReqInfo reqInfo) {
+        int pathSz = reqInfo.pathVariables.size();
+        if(pathSz ==2){
+            int updateBookId = stoi(reqInfo.pathVariables[1]);
+            bool updatedFlag = false;
+
+            for(int i = 0;i<bookStore.size();i++)
+            {
+                if(bookStore[i].bookId == updateBookId){
+                    json updateBody = reqInfo.jsonBody;
+                    if(updateBody.contains("bookTitle")){
+                        bookStore[i].bookTitle = updateBody["bookTitle"];
+                    }
+                    if(updateBody.contains("author")){
+                        bookStore[i].author = updateBody["author"];
+                    }
+                    if(updateBody.contains("pageCount")){
+                        bookStore[i].pageCount = updateBody["pageCount"];
+                    }
+
+                    updatedFlag = true;
+                    break;
+                }
+            }
+
+            if(!updatedFlag){
+                returnErrorResponse(400, "Bad Request");
+                return;
+            }
+
+            m_serverMessage = buildResponse("Updated Successfully");
+            sendResponse();
+        }
+        else{
+            returnErrorResponse(400, "Bad Request");
         }
         return;
     }
 
-    void TcpServer::reqPostHandler(http::TcpServer::ReqInfo reqInfo) {
+    void TcpServer::reqDeleteHandler(TcpServer::ReqInfo reqInfo) {
+        if(reqInfo.pathVariables.size()>1){
+            int deleteBookId = stoi(reqInfo.pathVariables[1]);
+            bool deletedFlag = false;
 
-        std::string stringBody = reqInfo.jsonBody.dump();
-        m_serverMessage = buildResponse(stringBody);
-        std::cout<< " Came to gethandler  " <<reqInfo.reqMethod<< std::endl;
-        for(auto mem:reqInfo.pathVariables){
-            std::cout<<mem<<std::endl;
+            for(int i = 0;i<bookStore.size();i++)
+            {
+                if(bookStore[i].bookId == deleteBookId){
+                    bookStore.erase(bookStore.begin()+i);
+                    deletedFlag = true;
+                    break;
+                }
+            }
+
+            if(!deletedFlag){
+                returnErrorResponse(400, "Bad Request");
+                return;
+            }
+
+            m_serverMessage = buildResponse("deletedSuccessfully");
+            sendResponse();
         }
-        sendResponse();
+        else{
+            returnErrorResponse(400, "Bad Request");
+        }
         return;
     }
+
+    void TcpServer::returnErrorResponse(int code, std::string message) {
+
+        m_serverMessage = buildResponse(message,code, message);
+        sendResponse();
+    }
+
+
 
 }
 

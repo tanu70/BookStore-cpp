@@ -48,12 +48,13 @@ namespace http {
             int bookId, pageCount;
 
         };
+        int nextBookId = 0;
 
         std::vector<BookInfo> bookStore;
 
         int startServer();
         void closeServer();
-        std::string buildResponse(std::string resBody = "");
+        std::string buildResponse(std::string resBody = "", int resCode = 200, std::string resMessage = "OK");
         void acceptConnection();
         void sendResponse();
 
@@ -63,6 +64,9 @@ namespace http {
 
         void reqGetHandler(ReqInfo reqInfo);
         void reqPostHandler(ReqInfo reqInfo);
+        void reqPutHandler(ReqInfo reqInfo);
+        void reqDeleteHandler(ReqInfo reqInfo);
+        void returnErrorResponse(int code = 404,std::string message = "Not Found");
 
         int reqCount=0;
 
